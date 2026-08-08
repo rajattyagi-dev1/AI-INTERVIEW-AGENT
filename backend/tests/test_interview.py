@@ -346,6 +346,33 @@ class TestPromptBuilder:
             assert "role" in m
             assert "content" in m
 
+    def test_topic_context_injected_on_topic_transition(self):
+        from interview.prompt_builder import build_turn_messages
+        from interview.question_engine import process_llm_response
+        state = self._make_state()
+
+        # Turn 1: Initial topic (Topic 0)
+        msgs1 = build_turn_messages(state)
+        topic0_title = state.current_topic.title
+        assert any(topic0_title in m["content"] for m in msgs1 if m["role"] == "system")
+
+        # Simulate LLM response for turn 1 (wants_followup = False -> advances to next topic)
+        raw = '{"reply": "First question?", "wants_followup": false, "followup_reason": ""}'
+        process_llm_response(raw, state)
+
+        # Candidate answers question 1
+        state.history.append({"role": "assistant", "content": "First question?"})
+        state.history.append({"role": "user", "content": "My answer to question 1."})
+
+        # Turn 2: Advanced to Topic 1
+        assert state.topic_index == 1
+        topic1_title = state.current_topic.title
+        msgs2 = build_turn_messages(state)
+
+        # Verify topic context for Topic 1 is injected in system messages
+        system_contents = [m["content"] for m in msgs2 if m["role"] == "system"]
+        assert any(topic1_title in content for content in system_contents)
+
 
 # ---------------------------------------------------------------------------
 # POST /api/interview integration tests (mock LLM)

@@ -139,17 +139,8 @@ def build_turn_messages(state: SessionState) -> list[dict]:
         diff_hint = _DIFFICULTY_HINT.get(topic.difficulty, "")
         label_hint = _LABEL_HINT.get(topic.label, "")
 
-        # Only inject when no history or the last exchange was from the candidate
-        # (i.e. this is the LLM's first question on a new topic)
-        needs_topic_injection = (
-            len(state.history) == 0
-            or state.history[-1].get("role") == "user"
-            or (ts.followups_asked == 0 and state.total_questions_asked > 0
-                and _last_role(state.history) == "user")
-        )
-
         # Inject topic context as a system hint when starting fresh on a topic
-        if ts.followups_asked == 0 and _last_role(state.history) != "user":
+        if ts.followups_asked == 0:
             # First question on this topic — add topic context
             topic_context = (
                 f"[Topic context — not visible to candidate]\n"
