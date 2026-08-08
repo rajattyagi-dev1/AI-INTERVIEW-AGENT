@@ -191,3 +191,67 @@ enough question capacity.
 ### Task 2 Status
 
 Complete.
+
+---
+
+## Task 3 — LLM Provider Abstraction
+
+### Objective
+
+Build a provider abstraction layer so the interview engine can call any LLM without knowing which provider is in use. Implement the OpenAI provider as the real implementation, add Groq and Anthropic stubs (no new dependencies), create a factory driven by environment variables, and add unit tests for all behaviour. No interview logic, no session state, no frontend changes.
+
+---
+
+### Prompt That Initiated Task 3
+
+The following prompt was submitted to Kiro:
+
+> Task 3 — LLM Provider Abstraction
+>
+> Before making any changes, inspect: data/, docs/technical-spec.md, existing backend/, existing planner/, PROMPTS.md.
+>
+> Do not modify data/ or docs/.
+>
+> Implement ONLY the LLM provider abstraction layer.
+>
+> Requirements:
+> 1. Create a small provider interface/protocol that exposes a chat() method.
+> 2. Define a common message/response structure so the interview engine can use an LLM without knowing which provider is being used.
+> 3. Implement the OpenAI provider as the real provider.
+> 4. Add stub providers for Anthropic and Groq only if they fit the existing architecture. They must not introduce unnecessary dependencies.
+> 5. Create a provider factory that selects the provider using: LLM_PROVIDER
+> 6. Support configuration through environment variables: LLM_PROVIDER, LLM_MODEL, LLM_API_KEY
+> 7. Keep real secrets in the existing gitignored .env. Do not write any real API key into source code or tracked files.
+> 8. Add/update .env.example with placeholder values only.
+> 9. Add unit tests for: provider interface/response structure, factory provider selection, unknown provider handling, mock provider behaviour, missing API key/configuration handling where appropriate.
+> 10. Do NOT implement: question generation, prompt builder, interview state machine, session store, adaptive follow-ups, feedback generation, frontend changes, database, Redis, LangChain, unnecessary infrastructure.
+> 11. Do not modify the existing Task 1 or Task 2 planner behaviour.
+> 12. Run the complete backend test suite after implementation and report: tests passed, tests failed, any errors and how they were fixed.
+> 13. Append a concise Task 3 entry to PROMPTS.md.
+>
+> Then STOP.
+
+### Result
+
+Task 3 was completed successfully.
+
+- OpenAI provider implemented using the OpenAI SDK.
+- Groq provider added using the OpenAI-compatible API.
+- Anthropic provider kept as a stub.
+- Mock provider added for deterministic testing.
+- Provider factory and environment-based configuration added.
+- `.env.example` updated with placeholder configuration.
+- No interview logic, frontend changes, or session-state logic were added.
+
+### Verification
+
+- **177 tests passed**
+- **0 tests failed**
+- Python 3.12.4
+- pytest 8.3.4
+
+During testing, a mocking issue was encountered because `patch()` was initially targeting the wrong location. It was corrected to patch the imported name where it is actually used.
+
+### Human Decision
+
+Task 3 was reviewed after the complete test suite passed. The implementation was accepted and the project was moved forward to Task 4.
