@@ -254,4 +254,38 @@ During testing, a mocking issue was encountered because `patch()` was initially 
 
 ### Human Decision
 
-Task 3 was reviewed after the complete test suite passed. The implementation was accepted and the project was moved forward to Task 4.
+Task 3 was reviewed after the complete test suite passed. The implementation was accepted and the project was moved forward to Task 4
+
+---
+
+## Task 4 — Core Interview Engine
+
+### Objective
+
+Implement the core interview flow:
+
+- Session state management
+- Question engine
+- Prompt builder
+- `POST /api/interview` continuation flow
+- Interview completion rules
+- Unit tests
+
+### Prompt Used
+
+> Continue Task 4 using the existing planner, models, and LLM provider abstraction.
+> Implement session state, question engine, prompt builder, and `/api/interview` continuation.
+> Track total questions, completed topics, and curriculum days separately.
+> The interview must not finish before 8 questions, 4 distinct curriculum days, and completion of the current topic.
+> Add tests and run the full backend test suite.
+> Do not modify `data/`, `docs/`, planner behaviour, or frontend.
+
+### Implementation & Human Decision
+
+Kiro created the core interview files and API integration. A completion-condition test initially failed (`39 passed, 1 failed`). I reviewed the state transition and fixed the completion logic manually.
+
+### Result
+
+**217 backend tests passed, 0 failed.**
+
+---
