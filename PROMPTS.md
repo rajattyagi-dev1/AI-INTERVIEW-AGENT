@@ -1,0 +1,193 @@
+# AI Usage / Vibe-Coding Log
+
+**Project:** AI Interview Agent  
+**Hackathon:** 48-hour vibe-coding hackathon  
+**Problem Statement:** #2 — The Interview Agent  
+**Log format:** One entry per implementation task, documenting prompts, AI actions, errors, resolutions, and human decisions.
+
+---
+
+## Task 1 — Project Scaffolding
+
+### Objective
+
+Create the foundational project structure for the AI Interview Agent:
+- FastAPI backend with a placeholder `POST /api/interview` endpoint
+- React + Vite + TypeScript frontend with a placeholder UI
+- Clear backend/frontend separation
+- Environment configuration without committing secrets
+- Pydantic API schemas matching the technical specification
+- Data loader for `curriculum.json` and `candidates.json`
+- Vite dev-server proxy routing `/api` to the FastAPI backend
+
+No interview logic, LLM integration, question engine, state machine, feedback generation, or polished UI were to be implemented in this task.
+
+---
+
+### Prompt That Initiated Task 1
+
+The following prompt was submitted to Kiro to begin implementation:
+
+> We are building the AI Interview Agent for the hackathon.
+>
+> Before making any changes, inspect the existing project, especially:
+> - data/
+> - docs/
+>
+> The provided curriculum, candidate profiles, and technical specification are authoritative hackathon resources. Do not modify or replace them.
+>
+> We will implement the project incrementally.
+>
+> For the first step, create ONLY an implementation plan for Task 1: Project Scaffolding.
+>
+> The target architecture is:
+> - FastAPI backend
+> - React + Vite + TypeScript frontend
+> - backend and frontend clearly separated
+> - simple hackathon-friendly architecture
+> - no Redis, no microservices, no LangChain, no unnecessary infrastructure
+> - environment configuration without committing secrets
+> - preserve the existing data/ and docs/ directories
+>
+> The final backend must expose: POST /api/interview
+>
+> For the interview state, remember this important requirement:
+> - total_questions_asked
+> - topics_completed
+> - days_covered
+> must be tracked separately. Every interviewer question, including follow-up questions, counts toward total_questions_asked.
+>
+> The interview cannot finish until:
+> - total_questions_asked >= 8
+> - at least 4 distinct curriculum days are covered
+> - the current topic is complete
+>
+> For Task 1, DO NOT implement interview logic, LLM integration, question selection, state machine, feedback generation, or the polished frontend.
+>
+> Only analyze the existing project and propose the scaffolding.
+>
+> Show:
+> 1. Proposed directory structure
+> 2. Files that will be created
+> 3. Files that will remain untouched
+> 4. Technologies/dependencies required
+> 5. Commands needed to run backend and frontend
+> 6. Any assumptions or potential issues
+>
+> Do not make any file changes yet. Wait for approval.
+
+---
+### Human Decision
+
+Reviewed the proposed Task 1 plan and approved implementation.
+
+### Implementation Summary
+
+Created the initial FastAPI and React/TypeScript project structure,
+including API schemas, data loading, environment configuration,
+frontend API wrapper, and Vite proxy.
+
+The provided `data/` and `docs/` resources were left untouched.
+
+### Issues Resolved
+
+- Python 3.14 caused a `pydantic-core` build problem → recreated the
+  virtual environment using Python 3.12.
+- Vite's interactive scaffolding timed out → frontend structure was
+  completed manually.
+- Port 5173 was already occupied → Vite used port 5174 and the API
+  proxy continued working.
+
+### Verification
+
+- `GET /health` → successful
+- `POST /api/interview` initialization → successful
+- `POST /api/interview` continuation → successful
+- Invalid request → correctly returned HTTP 400
+- Frontend → HTTP 200
+- Vite `/api` proxy → successfully reached FastAPI
+
+### Task 1 Status
+
+Complete.
+
+
+
+
+
+---
+
+## Task 2 — Candidate-Aware Interview Planning Layer
+
+### Objective
+
+Build a deterministic backend planning layer that converts a candidate profile and the curriculum into a structured interview plan. The planner must use the actual fields present in `candidates.json` and `curriculum.json`, support eventual interview requirements (≥8 questions, ≥4 distinct days), and include unit tests. No LLM, no conversation generation, no adaptive follow-ups, no feedback generation, no frontend changes.
+
+---
+
+### Prompt That Initiated Task 2
+
+The following prompt was submitted to Kiro:
+
+> Task 2 — Build the candidate-aware interview planning layer.
+>
+> First inspect: data/curriculum.json, data/candidates.json, docs/technical-spec.md, the files created during Task 1, and the existing PROMPTS.md.
+>
+> Do NOT modify data/ or docs/.
+>
+> Implement ONLY Task 2. Build a deterministic backend planning layer that converts a candidate profile and the curriculum into a structured interview plan for the future interview engine.
+>
+> The planner must use the ACTUAL fields present in candidates.json and curriculum.json. It should determine: completed curriculum days/topics, skipped topics, failed/attempt information if present, learning signals, candidate role, experience and education where available, prioritized topics for assessment, suitable difficulty/assessment strategy.
+>
+> The planner must support the eventual requirement of: at least 8 interviewer questions, at least 4 distinct curriculum days, questions based on concepts the candidate has completed, adaptive follow-up questions later.
+>
+> For this task: use deterministic logic, create structured planner models, add unit tests, do NOT implement the LLM, do NOT implement conversation generation, do NOT implement adaptive follow-ups, do NOT implement final feedback, do NOT implement frontend polish, do NOT add a database, Redis, LangChain, or unnecessary infrastructure, do NOT modify the provided hackathon resources.
+>
+> After implementation: run all relevant tests, report the test results, show files created/modified, explain which real candidate/curriculum fields were used, append an accurate Task 2 entry to the EXISTING root PROMPTS.md, and STOP.
+
+---
+
+### Human Decisions and Approvals
+
+Kiro performed a pre-implementation context-gathering pass, reading the full contents of `curriculum.json`, `candidates.json`, and the Task 1 backend files before writing any code. This confirmed the exact field shapes (three distinct mission shapes: passed+attempts, failed+attempts, skipped-only), the full range of candidate signals, module structure, and day type values.
+
+No separate plan approval step was required for this task — the prompt was sufficiently specific to proceed directly to implementation.
+
+---
+### Human Decision
+
+Approved Task 2 implementation after reviewing the scope.
+The implementation was required to remain deterministic and use
+the provided hackathon data rather than invented fields.
+
+### Implementation Summary
+
+Kiro created:
+
+- `backend/planner/models.py`
+- `backend/planner/scoring.py`
+- `backend/planner/builder.py`
+- `backend/tests/test_scoring.py`
+- `backend/tests/test_builder.py`
+
+The planner scores candidate missions, calibrates difficulty,
+selects topics, ensures curriculum-day coverage, and guarantees
+enough question capacity.
+
+### Issues Resolved
+
+- All-mastered candidates initially produced fewer than 8 estimated
+  questions → added question-floor handling.
+- Sparse candidates did not always reach the required topic coverage
+  → expanded fallback pillar days.
+- Fixed an omitted `MIN_QUESTIONS` import.
+- Fixed a syntax error introduced during editing.
+- Corrected an incorrect test assumption.
+
+### Verification
+
+`116 passed, 0 failed`
+
+### Task 2 Status
+
+Complete.
