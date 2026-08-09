@@ -176,11 +176,24 @@ async def _generate_feedback(state: SessionState, llm) -> Feedback:
     try:
         resp = llm.chat(messages, json_mode=True, temperature=0.3)
         data = json.loads(resp.content)
+        if not isinstance(data, dict):
+            return _fallback_feedback(state)
+
+        def _to_list(val: Any) -> list[str]:
+            if isinstance(val, list):
+                return [str(x) for x in val if x is not None and str(x).strip()]
+            return []
+
+        strengths = _to_list(data.get("strengths"))
+        gaps = _to_list(data.get("gaps"))
+        next_steps = _to_list(data.get("next"))
+
+        fallback = _fallback_feedback(state)
         return Feedback(
-            summary=str(data.get("summary", "Interview completed.")),
-            strengths=list(data.get("strengths", [])),
-            gaps=list(data.get("gaps", [])),
-            next=list(data.get("next", [])),
+            summary=str(data.get("summary") or fallback.summary),
+            strengths=strengths or fallback.strengths,
+            gaps=gaps or fallback.gaps,
+            next=next_steps or fallback.next,
         )
     except Exception:
         return _fallback_feedback(state)

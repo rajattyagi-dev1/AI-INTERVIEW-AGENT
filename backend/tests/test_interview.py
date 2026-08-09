@@ -364,6 +364,34 @@ class TestPromptBuilder:
             assert "role" in m
             assert "content" in m
 
+    def test_followup_preserves_topic_and_retains_history(self):
+        from interview.prompt_builder import build_turn_messages
+        from interview.question_engine import process_llm_response
+        state = self._make_state()
+        initial_topic = state.current_topic.title
+
+        raw = '{"reply": "Can you elaborate?", "wants_followup": true, "followup_reason": "vague"}'
+        process_llm_response(raw, state)
+
+        candidate_ans = "I meant sentence embeddings convert text to vectors."
+        state.history.append({"role": "assistant", "content": "Can you elaborate?"})
+        state.history.append({"role": "user", "content": candidate_ans})
+
+        assert state.current_topic.title == initial_topic
+        msgs = build_turn_messages(state)
+        history_contents = [m["content"] for m in msgs]
+        assert candidate_ans in history_contents
+
+    def test_feedback_prompt_contains_candidate_actual_response(self):
+        from interview.prompt_builder import build_feedback_messages
+        state = self._make_state()
+        answer = "Cosine similarity measures the angle between vectors."
+        state.history.append({"role": "user", "content": answer})
+
+        msgs = build_feedback_messages(state)
+        user_content = msgs[1]["content"]
+        assert answer in user_content
+
 
 # ---------------------------------------------------------------------------
 # POST /api/interview integration tests (mock LLM)
@@ -562,3 +590,39 @@ class TestAPIFlow:
         assert "done" in body
         assert isinstance(body["reply"], str)
         assert isinstance(body["done"], bool)
+
+    def test_malformed_feedback_json_causes_safe_fallback(self):
+        """Verify that malformed/non-list feedback JSON returns valid fallback feedback instead of error."""
+        from interview.session_store import get_session
+        from planner.models import MIN_QUESTIONS, MIN_DISTINCT_DAYS
+
+        client = _make_client()
+        with _mock_llm_turn():
+            client.post("/api/interview", json=INIT_PAYLOAD)
+
+        state = get_session("test-session-api")
+        assert state is not None
+        state.total_questions_asked = MIN_QUESTIONS
+        for d in list(CURRICULUM_BY_DAY.keys())[:MIN_DISTINCT_DAYS]:
+            state.days_covered.add(d)
+        for ts in state.topic_states:
+            ts.is_complete = True
+        state.topic_index = len(state.topic_states)
+
+        malformed_feedback = '{"summary": "Done", "strengths": "not a list", "gaps": 123, "next": null}'
+        with _mock_llm_all(feedback_resp=malformed_feedback):
+            resp = client.post("/api/interview", json={
+                "sessionId": "test-session-api",
+                "message": "Final answer.",
+            })
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["done"] is True
+        fb = body["feedback"]
+        assert isinstance(fb["strengths"], list)
+        assert len(fb["strengths"]) > 0
+        assert isinstance(fb["gaps"], list)
+        assert len(fb["gaps"]) > 0
+        assert isinstance(fb["next"], list)
+        assert len(fb["next"]) > 0
