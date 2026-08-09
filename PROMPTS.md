@@ -289,3 +289,12 @@ Kiro created the core interview files and API integration. A completion-conditio
 **217 backend tests passed, 0 failed.**
 
 ---
+
+
+### Additional Fix — Minimum Question Enforcement
+
+During end-to-end testing, the interview was completing at 7 questions even though the required minimum was 8. The planner had enough follow-up capacity, but the question engine could exhaust topics before reaching the minimum.
+
+The question engine was updated to enforce the minimum-question requirement, with a regression test added.
+
+**Result:** 41 interview tests passed and the real API was verified to complete at exactly 8 questions, covering 6 curriculum days.
