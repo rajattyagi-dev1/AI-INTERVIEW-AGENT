@@ -136,8 +136,8 @@ def _parse_llm_json(raw: str) -> tuple[str, bool]:
     Falls back gracefully if JSON is malformed.
     """
     try:
-        data = json.loads(raw.strip())
-        reply = str(data.get("reply", raw))
+        data = json.loads(raw)
+        reply = data.get("reply") or data.get("question") or ""
         wants_followup = bool(data.get("wants_followup", False))
         return reply, wants_followup
     except (json.JSONDecodeError, AttributeError, TypeError):

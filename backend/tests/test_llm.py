@@ -278,6 +278,7 @@ class TestFactory:
         assert "openai" in str(exc_info.value)
         assert "groq" in str(exc_info.value)
         assert "anthropic" in str(exc_info.value)
+        assert "gemini" in str(exc_info.value)
 
     def test_openai_provider_selected_by_name(self):
         from llm.factory import get_llm_provider
@@ -294,6 +295,14 @@ class TestFactory:
         with patch.object(GroqProvider, "__init__", return_value=None):
             provider = get_llm_provider(settings=settings)
             assert isinstance(provider, GroqProvider)
+
+    def test_gemini_provider_selected_by_name(self):
+        from llm.factory import get_llm_provider
+        from llm.gemini_provider import GeminiProvider
+        settings = _make_settings(LLM_PROVIDER="gemini", LLM_API_KEY="gem-test")
+        with patch.object(GeminiProvider, "__init__", return_value=None):
+            provider = get_llm_provider(settings=settings)
+            assert isinstance(provider, GeminiProvider)
 
     def test_anthropic_provider_selected_by_name(self):
         from llm.factory import get_llm_provider
@@ -507,3 +516,74 @@ class TestStubProviders:
             assert provider is not None
             call_kwargs = mock_openai.call_args.kwargs
             assert "groq.com" in call_kwargs.get("base_url", "")
+
+
+# ---------------------------------------------------------------------------
+# TestGeminiProvider
+# ---------------------------------------------------------------------------
+
+class TestGeminiProvider:
+    def test_gemini_empty_key_raises(self):
+        from llm.gemini_provider import GeminiProvider
+        with pytest.raises(ValueError, match="API key"):
+            GeminiProvider(api_key="", model="gemini-2.5-flash")
+
+    def test_gemini_provider_name(self):
+        from llm.gemini_provider import GeminiProvider
+        assert GeminiProvider.PROVIDER_NAME == "gemini"
+
+    def test_gemini_constructs_with_valid_key(self):
+        from llm.gemini_provider import GeminiProvider
+        with patch("llm.gemini_provider.OpenAI") as mock_openai:
+            mock_openai.return_value = MagicMock()
+            provider = GeminiProvider(api_key="gem-test", model="gemini-2.5-flash")
+            assert provider is not None
+            call_kwargs = mock_openai.call_args.kwargs
+            assert "googleapis.com" in call_kwargs.get("base_url", "")
+
+    def test_gemini_chat_passes_parameters(self):
+        from llm.gemini_provider import GeminiProvider
+        mock_completion = MagicMock()
+        mock_completion.choices[0].message.content = "Gemini response"
+        mock_completion.model = "gemini-2.5-flash"
+        mock_completion.usage.prompt_tokens = 15
+        mock_completion.usage.completion_tokens = 25
+        mock_completion.usage.total_tokens = 40
+
+        with patch("llm.gemini_provider.OpenAI") as mock_openai_cls:
+            mock_client = MagicMock()
+            mock_client.chat.completions.create.return_value = mock_completion
+            mock_openai_cls.return_value = mock_client
+
+            provider = GeminiProvider(api_key="gem-test", model="gemini-2.5-flash")
+            messages = [LLMMessage.of("user", "Hello Gemini")]
+            result = provider.chat(messages, temperature=0.5)
+
+            assert isinstance(result, LLMResponse)
+            assert result.content == "Gemini response"
+            assert result.provider == "gemini"
+            assert result.usage["total_tokens"] == 40
+
+            call_kwargs = mock_client.chat.completions.create.call_args.kwargs
+            assert call_kwargs["model"] == "gemini-2.5-flash"
+            assert call_kwargs["messages"] == messages
+            assert call_kwargs["temperature"] == 0.5
+
+    def test_gemini_json_mode_sets_response_format(self):
+        from llm.gemini_provider import GeminiProvider
+        mock_completion = MagicMock()
+        mock_completion.choices[0].message.content = '{"reply": "test"}'
+        mock_completion.model = "gemini-2.5-flash"
+        mock_completion.usage = None
+
+        with patch("llm.gemini_provider.OpenAI") as mock_openai_cls:
+            mock_client = MagicMock()
+            mock_client.chat.completions.create.return_value = mock_completion
+            mock_openai_cls.return_value = mock_client
+
+            provider = GeminiProvider(api_key="gem-test", model="gemini-2.5-flash")
+            provider.chat([{"role": "user", "content": "JSON"}], json_mode=True)
+
+            call_kwargs = mock_client.chat.completions.create.call_args.kwargs
+            assert call_kwargs["response_format"] == {"type": "json_object"}
+

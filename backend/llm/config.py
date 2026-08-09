@@ -20,7 +20,7 @@ class LLMSettings(BaseSettings):
     Environment-variable–backed LLM configuration.
 
     Variables (set in backend/.env):
-        LLM_PROVIDER   — which provider to use: openai | groq | anthropic | mock
+        LLM_PROVIDER   — which provider to use: openai | groq | anthropic | gemini | mock
         LLM_MODEL      — model name for the chosen provider
         LLM_API_KEY    — API key (never committed to source control)
 

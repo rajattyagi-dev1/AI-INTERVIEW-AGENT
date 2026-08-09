@@ -100,8 +100,9 @@ async def _handle_continue(request: InterviewRequest) -> InterviewResponse:
             detail="This interview session has already completed.",
         )
 
-    # Append candidate answer to history
-    state.history.append({"role": "user", "content": request.message})
+    # Avoid appending duplicate user message if retrying the same turn after error
+    if not state.history or state.history[-1].get("content") != request.message:
+        state.history.append({"role": "user", "content": request.message})
 
     # Ask the next question (or generate feedback if done)
     return await _ask_question(state)
@@ -123,10 +124,26 @@ async def _ask_question(state: SessionState) -> InterviewResponse:
     try:
         llm_resp = llm.chat(messages, json_mode=True, temperature=0.7)
         raw = llm_resp.content
-    except Exception:
-        # On LLM failure: return a canned recovery message, don't lose state
+    except Exception as e:
+        status_code = getattr(e, "status_code", None)
+        err_str = str(e).lower()
+        is_429 = (
+            status_code == 429
+            or "429" in err_str
+            or "quota" in err_str
+            or "rate limit" in err_str
+            or "resource_exhausted" in err_str
+            or "ratelimiterror" in type(e).__name__.lower()
+        )
+        if is_429:
+            raise HTTPException(
+                status_code=429,
+                detail="LLM API rate limit or quota exceeded (HTTP 429). Please wait a moment and click Retry.",
+            )
+
+        # For non-429 unexpected failures, use a canned recovery turn message
         raw = json.dumps({
-            "reply": "I'm having a technical issue. Could you please repeat your last answer?",
+            "reply": "I'm having a brief technical issue. Could you please repeat your last answer?",
             "wants_followup": True,
             "followup_reason": "technical retry",
         })

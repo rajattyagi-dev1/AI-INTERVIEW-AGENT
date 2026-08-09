@@ -18,6 +18,7 @@ Supported providers
 openai      — OpenAIProvider   (fully implemented)
 groq        — GroqProvider     (fully implemented; uses openai SDK)
 anthropic   — AnthropicProvider (stub; raises NotImplementedError on chat)
+gemini      — GeminiProvider   (fully implemented; uses openai SDK)
 mock        — MockProvider     (for tests; no API key required)
 """
 
@@ -74,12 +75,16 @@ def get_llm_provider(settings: LLMSettings | None = None) -> LLMProvider:
             from llm.anthropic_provider import AnthropicProvider
             return AnthropicProvider(api_key=api_key, model=model)
 
+        case "gemini":
+            from llm.gemini_provider import GeminiProvider
+            return GeminiProvider(api_key=api_key, model=model)
+
         case "mock":
             from llm.mock_provider import MockProvider
             return MockProvider()
 
         case _:
-            supported = "openai, groq, anthropic, mock"
+            supported = "openai, groq, anthropic, gemini, mock"
             raise ValueError(
                 f"Unknown LLM provider: '{provider_name}'. "
                 f"Supported providers: {supported}. "

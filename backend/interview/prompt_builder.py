@@ -77,7 +77,9 @@ For each interviewer turn, respond with ONLY a JSON object in this exact format:
 Rules:
 - Ask ONE question per turn. Never ask multiple questions at once.
 - If the candidate's answer is vague or incomplete, set wants_followup to true.
-- When asking a follow-up, explicitly address or clarify a specific point, claim, term, or misconception from the candidate's previous response.
+- When asking a follow-up, explicitly address or clarify a specific point, claim, term, or misconception from the candidate's previous response. Use the candidate's previous answer to decide whether to probe deeper or move to a different aspect.
+- Vary the conceptual angle of each question and avoid testing the same concept repeatedly.
+- Cover different curriculum objectives within the current topic before repeating any area.
 - If the answer is satisfactory or you have asked enough follow-ups, set wants_followup to false.
 - Never reveal that you are following a plan or that follow-up limits exist.
 - Keep questions under 60 words.
@@ -114,9 +116,10 @@ def build_turn_messages(state: SessionState) -> list[dict]:
     Structure:
       [system prompt]
       [conversation history so far]
-      [topic injection user message — only when starting a new topic]
+      [topic injection system message — only when starting a new topic]
     """
     profile = state.plan.candidate_profile
+
     system_content = _SYSTEM_TEMPLATE.format(
         name=profile.name,
         job_role=profile.job_role,
@@ -124,38 +127,58 @@ def build_turn_messages(state: SessionState) -> list[dict]:
         education=profile.education,
     )
 
-    messages: list[dict] = [{"role": "system", "content": system_content}]
+    messages: list[dict] = [
+        {"role": "system", "content": system_content}
+    ]
 
     # Append the full conversation history so the LLM has context
     messages.extend(state.history)
 
-    # If we are at the start of a new topic and history is empty or the last
-    # message was from the assistant (meaning we just closed a topic), inject
-    # the topic context as a user-visible instruction appended to the last
-    # assistant turn. We use a system message instead to keep it out of the
-    # visible chat but in LLM context.
     ts = state.current_topic_state
+
     if ts and not ts.is_complete:
         topic = ts.topic
         diff_hint = _DIFFICULTY_HINT.get(topic.difficulty, "")
         label_hint = _LABEL_HINT.get(topic.label, "")
 
-        # Inject topic context as a system hint when starting fresh on a topic
+        # First question on this topic — add topic context
         if ts.followups_asked == 0:
-            # First question on this topic — add topic context
+            is_topic_change = len(state.history) > 0
+            transition_header = (
+                f"[Topic Transition — Pivot to new topic. Do not ask about prior topics.]\n"
+                if is_topic_change
+                else f"[Topic Context — Initial topic]\n"
+            )
             topic_context = (
-                f"[Topic context — not visible to candidate]\n"
+                f"{transition_header}"
                 f"Current topic: Day {topic.day} — {topic.title}\n"
                 f"Module: {topic.module_title}\n"
                 f"Curriculum objectives:\n"
-                + "\n".join(f"  - {o}" for o in topic.objectives[:3])
+                + "\n".join(
+                    f"  - {o}" for o in topic.objectives[:3]
+                )
                 + f"\nTools: {', '.join(topic.tools[:4])}\n"
                 f"Assessment: {label_hint}\n"
                 f"Difficulty: {diff_hint}\n"
                 f"Interviewer notes: {topic.assessment_notes}\n"
-                f"Ask your first question about this topic now."
+                f"Focus explicitly on this current topic now. Ask your first question about Day {topic.day} — {topic.title}."
             )
-            messages.append({"role": "system", "content": topic_context})
+
+            messages.append({
+                "role": "system",
+                "content": topic_context,
+            })
+
+    # Gemini requires a user/content turn to generate a response.
+    # On the very first interview turn there is no candidate history yet.
+    if not state.history:
+        messages.append({
+            "role": "user",
+            "content": (
+                "Begin the interview by asking the candidate "
+                "the first technical question."
+            ),
+        })
 
     return messages
 

@@ -392,6 +392,31 @@ class TestPromptBuilder:
         user_content = msgs[1]["content"]
         assert answer in user_content
 
+    def test_system_prompt_contains_non_repetition_and_angle_rules(self):
+        from interview.prompt_builder import build_turn_messages
+        state = self._make_state()
+        msgs = build_turn_messages(state)
+        system_content = msgs[0]["content"]
+
+        assert "Vary the conceptual angle" in system_content
+        assert "avoid testing the same concept repeatedly" in system_content
+        assert "Cover different curriculum objectives" in system_content
+        assert "probe deeper or move to a different aspect" in system_content
+
+    def test_explicit_topic_transition_header_when_history_exists(self):
+        from interview.prompt_builder import build_turn_messages
+        state = self._make_state()
+        # Add conversation history from a prior topic
+        state.history.append({"role": "assistant", "content": "Question about Topic 1?"})
+        state.history.append({"role": "user", "content": "Answer about Topic 1."})
+
+        msgs = build_turn_messages(state)
+        # Check topic context system message (last message)
+        topic_msg = msgs[-1]["content"]
+        assert "Topic Transition" in topic_msg
+        assert "Pivot to new topic" in topic_msg
+        assert "Focus explicitly on this current topic now" in topic_msg
+
 
 # ---------------------------------------------------------------------------
 # POST /api/interview integration tests (mock LLM)
@@ -626,3 +651,18 @@ class TestAPIFlow:
         assert len(fb["gaps"]) > 0
         assert isinstance(fb["next"], list)
         assert len(fb["next"]) > 0
+
+    def test_rate_limit_error_returns_429_status_code(self):
+        """Verify that LLM rate limit / quota exceeded errors return HTTP 429 status code with clear message."""
+        from llm.mock_provider import MockProvider
+        from openai import RateLimitError
+        mock_resp = MagicMock()
+        mock_resp.status_code = 429
+        rate_limit_err = RateLimitError("Rate limit exceeded", response=mock_resp, body=None)
+
+        client = _make_client()
+        with patch("routers.interview.get_llm_provider", return_value=MockProvider(raises=rate_limit_err)):
+            resp = client.post("/api/interview", json=INIT_PAYLOAD)
+
+        assert resp.status_code == 429
+        assert "429" in resp.json()["detail"]
