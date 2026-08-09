@@ -2,34 +2,21 @@
  * App.tsx — Complete AI Technical Interview Interface.
  *
  * Implements the full end-to-end user flow:
- *   1. Welcome / candidate card screen
+ *   1. Welcome screen with candidate profile selection from supplied candidates.json
  *   2. Session initialization via POST /api/interview
- *   3. Interactive dark chat UI with progress bar
- *   4. Turn-by-turn answer submission with error handling
+ *   3. Interactive dark chat UI with progress bar & dynamic avatar initials
+ *   4. Turn-by-turn answer submission with 429 & retry handling
  *   5. Completion screen with executive summary, strengths, gaps & recommendations
  */
 
 import { useState, useRef, useEffect } from "react";
 import { postInterview, InterviewApiError } from "./api/interview";
 import type { Candidate, Feedback, InterviewResponse } from "./types/interview";
+import candidatesData from "../../data/candidates.json";
 import "./App.css";
 
-// STUB_CANDIDATE provided by Task 1 / scaffolding specs
-const STUB_CANDIDATE: Candidate = {
-  member: {
-    id: "CAND-001",
-    name: "Sarah Johnson",
-    jobRole: "Senior Data Engineer",
-    yearsExperience: 9,
-    education: "MS Computer Science",
-    status: "COMPLETED",
-  },
-  missions: [
-    { day: 7, title: "Embeddings Explained", passed: true, attempts: 1 },
-    { day: 12, title: "Prompt Engineering Fundamentals", passed: true, attempts: 4 },
-  ],
-  signals: { commitDays: 28, missionsCompleted: 30, missionsFirstTry: 20 },
-};
+// Supplied candidate profiles loaded directly from data/candidates.json
+const CANDIDATE_PROFILES: Candidate[] = candidatesData.candidates as Candidate[];
 
 interface ChatMessage {
   id: string;
@@ -47,9 +34,19 @@ function formatTime(): string {
   return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
+function getInitials(name: string): string {
+  if (!name) return "CA";
+  const parts = name.trim().split(/\s+/);
+  if (parts.length >= 2) {
+    return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+  }
+  return name.substring(0, 2).toUpperCase();
+}
+
 export default function App() {
   const [screen, setScreen] = useState<"welcome" | "interview" | "complete">("welcome");
   const [sessionId, setSessionId] = useState<string>("");
+  const [selectedCandidate, setSelectedCandidate] = useState<Candidate>(CANDIDATE_PROFILES[0]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputAnswer, setInputAnswer] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
@@ -76,7 +73,7 @@ export default function App() {
     }
   }, [messages, loading, screen]);
 
-  // Handler: Start a new interview session
+  // Handler: Start a new interview session with selected candidate profile
   async function handleStartInterview() {
     const newSessionId = generateSessionId();
     setSessionId(newSessionId);
@@ -91,7 +88,7 @@ export default function App() {
     try {
       const res: InterviewResponse = await postInterview({
         sessionId: newSessionId,
-        candidate: STUB_CANDIDATE,
+        candidate: selectedCandidate,
       });
 
       const initialMsg: ChatMessage = {
@@ -192,6 +189,8 @@ export default function App() {
     }
   }
 
+  const candidateInitials = getInitials(selectedCandidate.member.name);
+
   return (
     <div className="app-container">
       {/* App Header */}
@@ -217,37 +216,81 @@ export default function App() {
           <div className="welcome-hero">
             <h2>Personalized AI Technical Assessment</h2>
             <p>
-              Welcome to your technical interview. This AI agent assesses your understanding
-              of the AI Cohort curriculum, adapting to your specific learning path, passed missions,
+              Welcome to your technical interview. Select a candidate profile below to begin.
+              The AI agent will adapt questions based on your specific learning path, passed missions,
               and areas needing depth.
             </p>
           </div>
 
+          {/* Candidate Profile Dropdown Selector */}
+          <div className="candidate-selector-box" style={{ marginBottom: "20px" }}>
+            <label
+              htmlFor="candidate-select"
+              style={{
+                display: "block",
+                marginBottom: "8px",
+                fontWeight: "600",
+                color: "#94a3b8",
+                fontSize: "0.875rem",
+              }}
+            >
+              Select Candidate Profile:
+            </label>
+            <select
+              id="candidate-select"
+              className="candidate-dropdown"
+              value={selectedCandidate.member.id}
+              onChange={(e) => {
+                const found = CANDIDATE_PROFILES.find((c) => c.member.id === e.target.value);
+                if (found) setSelectedCandidate(found);
+              }}
+              disabled={loading}
+              style={{
+                width: "100%",
+                padding: "12px 16px",
+                borderRadius: "8px",
+                backgroundColor: "#1e293b",
+                color: "#f8fafc",
+                border: "1px solid #334155",
+                fontSize: "1rem",
+                cursor: "pointer",
+                outline: "none",
+              }}
+            >
+              {CANDIDATE_PROFILES.map((c) => (
+                <option key={c.member.id} value={c.member.id}>
+                  {c.member.name} — {c.member.jobRole} ({c.member.yearsExperience} yrs exp)
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Dynamic Candidate Profile Card */}
           <div className="candidate-profile-box">
             <div className="candidate-profile-header">
-              <div className="candidate-avatar">SJ</div>
+              <div className="candidate-avatar">{candidateInitials}</div>
               <div className="candidate-name-role">
-                <h3>{STUB_CANDIDATE.member.name}</h3>
-                <p>{STUB_CANDIDATE.member.jobRole}</p>
+                <h3>{selectedCandidate.member.name}</h3>
+                <p>{selectedCandidate.member.jobRole}</p>
               </div>
             </div>
 
             <div className="candidate-details-grid">
               <div className="detail-item">
                 <span className="detail-label">Experience</span>
-                <span className="detail-value">{STUB_CANDIDATE.member.yearsExperience} Years</span>
+                <span className="detail-value">{selectedCandidate.member.yearsExperience} Years</span>
               </div>
               <div className="detail-item">
                 <span className="detail-label">Education</span>
-                <span className="detail-value">{STUB_CANDIDATE.member.education}</span>
+                <span className="detail-value">{selectedCandidate.member.education}</span>
               </div>
               <div className="detail-item">
                 <span className="detail-label">Missions Completed</span>
-                <span className="detail-value">{STUB_CANDIDATE.signals.missionsCompleted} Missions</span>
+                <span className="detail-value">{selectedCandidate.signals.missionsCompleted} Missions</span>
               </div>
               <div className="detail-item">
                 <span className="detail-label">Commit Days</span>
-                <span className="detail-value">{STUB_CANDIDATE.signals.commitDays} Days</span>
+                <span className="detail-value">{selectedCandidate.signals.commitDays} Days</span>
               </div>
             </div>
           </div>
@@ -301,11 +344,11 @@ export default function App() {
               {messages.map((msg) => (
                 <div key={msg.id} className={`chat-message ${msg.role}`}>
                   <div className={`msg-avatar ${msg.role === "interviewer" ? "ai" : "user"}`}>
-                    {msg.role === "interviewer" ? "AI" : "SJ"}
+                    {msg.role === "interviewer" ? "AI" : candidateInitials}
                   </div>
                   <div className="msg-body">
                     <div className="msg-header">
-                      {msg.role === "interviewer" ? "AI Interviewer" : STUB_CANDIDATE.member.name}
+                      {msg.role === "interviewer" ? "AI Interviewer" : selectedCandidate.member.name}
                     </div>
                     <div className="msg-bubble">{msg.content}</div>
                     <div className="msg-time">{msg.timestamp}</div>
