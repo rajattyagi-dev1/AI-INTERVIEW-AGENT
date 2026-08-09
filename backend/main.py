@@ -11,6 +11,7 @@ Run with:
 
 from __future__ import annotations
 
+import os
 import sys
 
 # Python 3.11+ is required for match statements used in later tasks.
@@ -33,15 +34,20 @@ app = FastAPI(
 )
 
 # ---------------------------------------------------------------------------
-# CORS — allow the Vite dev server (port 5173) and any production origin.
-# Expand allow_origins for production deployment.
+# CORS — allow the Vite dev server and any production origins configured via
+# the CORS_ORIGINS environment variable (comma-separated).
 # ---------------------------------------------------------------------------
+default_origins = [
+    "http://localhost:5173",   # Vite dev server
+    "http://127.0.0.1:5173",
+]
+cors_env = os.getenv("CORS_ORIGINS", "")
+extra_origins = [o.strip() for o in cors_env.split(",") if o.strip()]
+allow_origins = list(dict.fromkeys(default_origins + extra_origins))
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",   # Vite dev server
-        "http://127.0.0.1:5173",
-    ],
+    allow_origins=allow_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

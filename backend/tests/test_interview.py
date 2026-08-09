@@ -666,3 +666,18 @@ class TestAPIFlow:
 
         assert resp.status_code == 429
         assert "429" in resp.json()["detail"]
+
+    def test_cors_origins_configured_from_environment(self):
+        """Verify that CORS_ORIGINS environment variable allows extra origins."""
+        import importlib
+        with patch.dict("os.environ", {"CORS_ORIGINS": "https://ai-interview-agent.vercel.app"}):
+            import main
+            importlib.reload(main)
+            from fastapi.middleware.cors import CORSMiddleware
+            cors_middlewares = [m for m in main.app.user_middleware if m.cls is CORSMiddleware]
+            assert len(cors_middlewares) > 0
+            allow_origins = cors_middlewares[0].kwargs.get("allow_origins", [])
+            assert "http://localhost:5173" in allow_origins
+            assert "https://ai-interview-agent.vercel.app" in allow_origins
+            # Reload main to restore original state
+            importlib.reload(main)

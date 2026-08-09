@@ -7,7 +7,8 @@
 
 import type { InterviewRequest, InterviewResponse } from "../types/interview";
 
-const ENDPOINT = "/api/interview";
+const BASE_URL = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
+const ENDPOINT = `${BASE_URL}/api/interview`;
 
 export class InterviewApiError extends Error {
   constructor(
