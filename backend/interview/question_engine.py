@@ -61,18 +61,31 @@ def process_llm_response(
     # --- Record this question ---
     record_question_asked(state)
 
+    from planner.models import MIN_QUESTIONS, MIN_DISTINCT_DAYS
+
     # --- Decide: follow up or advance ---
     ts = state.current_topic_state
     if ts is None:
-        # No more topics — should not normally happen mid-interview
-        state.is_done = True
-        return TurnResult(reply=reply, is_done=True)
+        # No more topics — only mark done if minimum questions & days are satisfied
+        is_done = (
+            state.total_questions_asked >= MIN_QUESTIONS
+            and len(state.days_covered) >= MIN_DISTINCT_DAYS
+        )
+        state.is_done = is_done
+        return TurnResult(reply=reply, is_done=is_done)
 
-    can_followup = (
-        wants_followup
-        and ts.followups_asked < ts.topic.max_followups
+    # Check follow-up capacity and whether closing topic now risks ending < MIN_QUESTIONS
+    has_capacity = (
+        ts.followups_asked < ts.topic.max_followups
         and not ts.is_complete
     )
+    remaining_unvisited = len(state.topic_states) - (state.topic_index + 1)
+    needs_followup_for_min = (
+        state.total_questions_asked < MIN_QUESTIONS
+        and (state.total_questions_asked + remaining_unvisited) < MIN_QUESTIONS
+    )
+
+    can_followup = (wants_followup or needs_followup_for_min) and has_capacity
 
     if can_followup:
         ts.followups_asked += 1
@@ -86,8 +99,6 @@ def process_llm_response(
         _force_close_remaining(state)
 
     # --- Check completion ---
-    from planner.models import MIN_QUESTIONS, MIN_DISTINCT_DAYS
-
     is_done = (
         state.total_questions_asked >= MIN_QUESTIONS
         and len(state.days_covered) >= MIN_DISTINCT_DAYS
