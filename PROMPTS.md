@@ -298,3 +298,160 @@ During end-to-end testing, the interview was completing at 7 questions even thou
 The question engine was updated to enforce the minimum-question requirement, with a regression test added.
 
 **Result:** 41 interview tests passed and the real API was verified to complete at exactly 8 questions, covering 6 curriculum days.
+
+
+---
+
+## Task 5 — Adaptive Interview Quality Improvements
+
+### Objective
+
+Improve the interview agent's ability to avoid repetitive questions and transition naturally between curriculum topics while preserving the existing interview state machine and completion requirements.
+
+### Prompt Used
+
+> Review the existing interview engine and prompt builder.
+>
+> Improve question quality so the interviewer:
+> - avoids repeating the same conceptual angle
+> - covers different curriculum objectives within the current topic
+> - uses the candidate's previous answer when deciding whether to follow up or move to another aspect
+> - explicitly pivots when transitioning to a new curriculum topic
+>
+> Do not weaken the existing requirements:
+> - minimum 8 questions
+> - at least 4 distinct curriculum days
+> - current topic must be complete before interview completion
+>
+> Add regression tests and run the complete backend test suite.
+>
+> Do not modify data/ or docs/.
+
+### Implementation
+
+Updated `backend/interview/prompt_builder.py` with:
+- non-repetition guidance
+- conceptual-angle variation
+- curriculum-objective coverage
+- adaptive probing instructions
+- explicit topic-transition context
+
+Added regression tests in `backend/tests/test_interview.py`.
+
+### Verification
+
+- 230 backend tests passed
+- 0 failed
+- Frontend production build successful
+
+### Human Decision
+
+Reviewed and accepted the changes.
+
+---
+
+## Task 6 — LLM Rate-Limit and Retry Handling
+
+### Objective
+
+Handle LLM provider HTTP 429/quota errors gracefully instead of exposing them as generic HTTP 500 errors.
+
+### Prompt / AI Action
+
+> Investigate the HTTP 500 error occurring during interview continuation.
+> Trace the backend stack to the LLM provider and distinguish provider rate-limit/quota errors from application errors.
+>
+> Update the interview endpoint to return a clean HTTP 429 response for LLM rate-limit/quota failures.
+>
+> Also prevent duplicate candidate answers from being appended to interview history when the frontend retries after a rate-limit error.
+>
+> Add regression tests and verify the complete backend suite.
+
+### Implementation
+
+Updated:
+- `backend/routers/interview.py`
+- `frontend/src/App.tsx`
+- `backend/tests/test_interview.py`
+
+The backend now converts provider rate-limit/quota failures into HTTP 429 responses.
+
+The frontend prevents duplicate submissions and duplicate candidate message bubbles when retrying.
+
+### Verification
+
+- Backend: 228 tests passed, 0 failed
+- Frontend: `npm run build` successful
+
+### Human Decision
+
+Reviewed the implementation and accepted the changes.
+
+---
+
+## Task 7 — Candidate Profile Selection
+
+### Objective
+
+Allow the UI to select among the supplied candidate profiles instead of always using a hardcoded candidate.
+
+### Prompt Used
+
+> Replace the hardcoded candidate profile in the frontend with the actual candidate profiles supplied in `data/candidates.json`.
+>
+> Add a candidate selector to the welcome screen.
+>
+> The selected candidate must be passed to `POST /api/interview`.
+>
+> The profile card and chat avatar initials must update dynamically based on the selected candidate.
+>
+> Preserve the existing backend architecture and interview state machine.
+>
+> Run the frontend build and complete backend tests.
+
+### Implementation
+
+Updated:
+
+- `frontend/src/App.tsx`
+
+The frontend now loads the supplied candidate profiles and allows the user to select a candidate before starting the interview.
+
+The selected candidate is passed to the backend during session initialization.
+
+The candidate profile card and avatar initials update dynamically.
+
+### Verification
+
+- Frontend production build successful
+- Backend tests: 230 passed, 0 failed
+
+### Human Decision
+
+Reviewed and accepted the implementation.
+
+---
+
+## Final Verification
+
+Before submission, the complete system was manually tested end-to-end.
+
+Verified:
+- Candidate selection works
+- Interview session initializes successfully
+- Questions are generated dynamically
+- Candidate responses can be submitted turn-by-turn
+- Follow-up questions are generated
+- Interview covers multiple curriculum days
+- Interview does not complete before the required minimum question count
+- Final structured feedback is generated
+- Rate-limit errors are surfaced as HTTP 429 instead of generic HTTP 500
+- Retry handling prevents duplicate candidate submissions
+- Frontend production build succeeds
+- Backend test suite passes
+
+Final backend test result:
+**230 passed, 0 failed**
+
+Final frontend build:
+**Successful**
